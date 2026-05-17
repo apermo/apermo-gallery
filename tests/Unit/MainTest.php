@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace Apermo\Gallery\Tests\Unit;
 
-// phpcs:disable SlevomatCodingStandard.Namespaces.AlphabeticallySortedUses.IncorrectlyOrderedUses -- The Apermo_Gallery\* import gets rewritten by setup.sh; final alphabetical position depends on the chosen namespace.
-
+use Apermo\Gallery\Main;
 use Brain\Monkey;
 use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
-use Apermo\Gallery\Main;
 
 /**
  * Tests for the Main class.

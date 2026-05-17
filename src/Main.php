@@ -66,5 +66,6 @@ class Main {
 	 * @return void
 	 */
 	public static function boot(): void {
+		Plugin::boot();
 	}
 }

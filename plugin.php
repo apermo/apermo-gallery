@@ -1,7 +1,7 @@
 <?php
 /*
- * Plugin Name: Apermo_Gallery
- * Description: A WordPress plugin.
+ * Plugin Name: Apermo Gallery
+ * Description: Flickr-style photo galleries built on the core Gallery block, with EXIF lightbox and disciplined image sizes.
  * Version:     0.1.0
  * Author:      Christoph Daum
  * Author URI:  https://apermo.de
