@@ -15,5 +15,6 @@ class Plugin {
 	 * @return void
 	 */
 	public static function boot(): void {
+		ImageSizes::register();
 	}
 }
