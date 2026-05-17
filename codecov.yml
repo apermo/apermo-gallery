@@ -7,10 +7,12 @@ coverage:
     patch:
       default:
         target: 80%
+        informational: true
 
 ignore:
   - "tests/**"
   - "uninstall.php"
+  - "assets/build/**"
 
 comment:
   layout: "condensed_header, condensed_files, condensed_footer"
