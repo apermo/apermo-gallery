@@ -19,5 +19,6 @@ class Plugin {
 		AttachmentFlag::register();
 		Cleanup::register();
 		BlockVariation::register();
+		Render::register();
 	}
 }
