@@ -20,5 +20,6 @@ class Plugin {
 		Cleanup::register();
 		BlockVariation::register();
 		Render::register();
+		Lightbox::register();
 	}
 }

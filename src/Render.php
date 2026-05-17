@@ -66,7 +66,7 @@ class Render {
 	 *
 	 * @param string $html The original block HTML.
 	 *
-	 * @return array{html: string, data: array<int, array{href: string, exif: string}>}
+	 * @return array{html: string, data: array<int, array{href: string, width: int, height: int, exif: string}>}
 	 */
 	private static function rewrite_image_attributes( string $html ): array {
 		$processor = new WP_HTML_Tag_Processor( $html );
@@ -100,9 +100,13 @@ class Render {
 				? $metadata['image_meta']
 				: [];
 
+			$large = wp_get_attachment_image_src( $attachment_id, ImageSizes::LARGE );
+
 			$data[ $attachment_id ] = [
-				'href' => is_string( $large_url ) && '' !== $large_url ? $large_url : (string) $medium_url,
-				'exif' => Exif::format( $image_meta ),
+				'href'   => is_string( $large_url ) && '' !== $large_url ? $large_url : (string) $medium_url,
+				'width'  => is_array( $large ) && isset( $large[1] ) ? (int) $large[1] : 0,
+				'height' => is_array( $large ) && isset( $large[2] ) ? (int) $large[2] : 0,
+				'exif'   => Exif::format( $image_meta ),
 			];
 
 			AttachmentFlag::flag( $attachment_id );
@@ -137,8 +141,8 @@ class Render {
 	/**
 	 * Wraps every `<img class="...wp-image-NNN...">` with an anchor to its large URL.
 	 *
-	 * @param string                                                  $html The HTML with rewritten img attributes.
-	 * @param array<int, array{href: string, exif: string}>           $data Per-attachment href + EXIF.
+	 * @param string                                                                       $html The HTML with rewritten img attributes.
+	 * @param array<int, array{href: string, width: int, height: int, exif: string}>       $data Per-attachment href + dimensions + EXIF.
 	 *
 	 * @return string
 	 */
@@ -157,8 +161,10 @@ class Render {
 				}
 
 				return sprintf(
-					'<a href="%s" data-apermo-exif="%s">%s</a>',
+					'<a href="%s" data-pswp-width="%d" data-pswp-height="%d" data-apermo-exif="%s">%s</a>',
 					esc_url( $data[ $attachment_id ]['href'] ),
+					$data[ $attachment_id ]['width'],
+					$data[ $attachment_id ]['height'],
 					esc_attr( $data[ $attachment_id ]['exif'] ),
 					$match[0],
 				);
