@@ -18,5 +18,6 @@ class Plugin {
 		ImageSizes::register();
 		AttachmentFlag::register();
 		Cleanup::register();
+		BlockVariation::register();
 	}
 }
