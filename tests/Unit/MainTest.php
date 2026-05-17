@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Plugin_Name\Tests\Unit;
+namespace Apermo\Gallery\Tests\Unit;
 
-// phpcs:disable SlevomatCodingStandard.Namespaces.AlphabeticallySortedUses.IncorrectlyOrderedUses -- The Plugin_Name\* import gets rewritten by setup.sh; final alphabetical position depends on the chosen namespace.
+// phpcs:disable SlevomatCodingStandard.Namespaces.AlphabeticallySortedUses.IncorrectlyOrderedUses -- The Apermo_Gallery\* import gets rewritten by setup.sh; final alphabetical position depends on the chosen namespace.
 
 use Brain\Monkey;
 use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
-use Plugin_Name\Main;
+use Apermo\Gallery\Main;
 
 /**
  * Tests for the Main class.
@@ -106,9 +106,6 @@ class MainTest extends TestCase {
 	 * @return void
 	 */
 	public function test_boot(): void {
-		// OPT-IN: confirm-deactivate — delete this stub if you declined the example.
-		Functions\stubs( [ 'is_admin' => false ] );
-
 		Main::boot();
 		$this->assertTrue( true );
 	}
