@@ -33,7 +33,7 @@ class Lightbox {
 			return;
 		}
 
-		$post = get_post( null );
+		$post = get_post( get_queried_object_id() );
 
 		if ( ! $post instanceof WP_Post || ! \str_contains( $post->post_content, 'is-apermo-gallery' ) ) {
 			return;

@@ -1,0 +1,1 @@
+(()=>{"use strict";const e=window.wp.blocks,l=window.wp.i18n;(0,e.registerBlockVariation)("core/gallery",{name:"apermo-gallery",title:(0,l.__)("Photo Gallery","apermo-gallery"),description:(0,l.__)("A Flickr-style gallery with EXIF data and a filmstrip in the lightbox.","apermo-gallery"),isDefault:!1,attributes:{className:"is-apermo-gallery"},scope:["inserter"]})})();

@@ -6,7 +6,6 @@ namespace Apermo\Gallery\Tests\Unit;
 
 use Apermo\Gallery\AttachmentFlag;
 use Brain\Monkey;
-use Brain\Monkey\Actions;
 use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
 
@@ -131,8 +130,8 @@ class AttachmentFlagTest extends TestCase {
 
 		$this->assertSame(
 			[
-				'delete'                  => 'Delete',
-				'apermo_gallery_flag'     => 'Mark as gallery image',
+				'delete'              => 'Delete',
+				'apermo_gallery_flag' => 'Mark as gallery image',
 			],
 			$result,
 		);

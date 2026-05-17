@@ -24,7 +24,7 @@ class CleanupTest extends TestCase {
 		Monkey\setUp();
 
 		Functions\when( 'trailingslashit' )->alias(
-			static fn ( string $path ): string => rtrim( $path, '/' ) . '/',
+			static fn ( string $path ): string => \rtrim( $path, '/' ) . '/',
 		);
 	}
 

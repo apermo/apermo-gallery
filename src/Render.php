@@ -102,11 +102,11 @@ class Render {
 	 * @return int
 	 */
 	private static function extract_attachment_id( string $class_attribute ): int {
-		if ( \preg_match( '/\bwp-image-(\d+)\b/', $class_attribute, $matches ) !== 1 ) {
+		if ( \preg_match( '/\bwp-image-(\d+)\b/', $class_attribute, $matchedes ) !== 1 ) {
 			return 0;
 		}
 
-		return (int) $matches[1];
+		return (int) $matchedes[1];
 	}
 
 	/**
@@ -196,15 +196,15 @@ class Render {
 	/**
 	 * Renders a single `<img>` wrapped in an anchor carrying PhotoSwipe + EXIF data.
 	 *
-	 * @param array<int, string> $match The preg_replace_callback match (full tag at 0, attachment ID at 1).
+	 * @param array<int, string> $matched The preg_replace_callback match (full tag at 0, attachment ID at 1).
 	 *
 	 * @return string
 	 */
-	private static function wrap_single_image( array $match ): string {
-		$attachment_id = (int) $match[1];
+	private static function wrap_single_image( array $matched ): string {
+		$attachment_id = (int) $matched[1];
 
 		if ( ! isset( self::$anchor_data[ $attachment_id ] ) ) {
-			return $match[0];
+			return $matched[0];
 		}
 
 		$data = self::$anchor_data[ $attachment_id ];
@@ -215,7 +215,7 @@ class Render {
 			$data['width'],
 			$data['height'],
 			esc_attr( $data['exif'] ),
-			$match[0],
+			$matched[0],
 		);
 	}
 
