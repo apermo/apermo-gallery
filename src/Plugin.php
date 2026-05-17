@@ -16,5 +16,6 @@ class Plugin {
 	 */
 	public static function boot(): void {
 		ImageSizes::register();
+		AttachmentFlag::register();
 	}
 }
