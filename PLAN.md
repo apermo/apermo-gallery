@@ -1,162 +1,229 @@
-# Apermo Gallery — Planning Notes
-
-Seed document for the planning session. Captures intent, hard constraints, and
-the open design questions to resolve before any code is written. Once decisions
-land, this file is replaced by a concrete spec (or rolled into `README.md` /
-`CLAUDE.md`).
-
-## Intent
+# Apermo Gallery — v0.1 Spec
 
 A minimalistic WordPress gallery plugin for publishing photo posts on
-apermo.de in a Flickr-like style: grid of photos that opens into a lightbox
-showing the full image, its EXIF data, and a thumbnail strip of the other
-images in the same gallery.
+apermo.de in a Flickr-style way: grid of photos that opens into a
+lightbox showing the full image, its EXIF data, and a thumbnail strip of
+the other images in the same gallery.
 
 The plugin reuses the WordPress core Gallery block instead of shipping a
-custom block. No admin sprawl, no CPT, no albums — a regular post or page
-with a gallery block is the unit of work.
+custom block. No admin sprawl, no CPT, no albums — a regular post or
+page with a gallery block is the unit of work.
+
+For the rationale behind each design choice and the alternatives we
+rejected, see [`DECISIONS.md`](DECISIONS.md).
 
 ## Hard constraints
 
 1. **Reuse `core/gallery`.** No new gallery block from scratch. Opt-in
-   behavior via a block style or variation, with server-side render
-   filtering for the gallery output.
-2. **Skip the WordPress thumbnail explosion for gallery photos.** Photos
-   uploaded for galleries must not generate the full set of intermediate
-   sizes (`thumbnail`, `medium`, `medium_large`, `large`, plus every
-   theme/plugin-registered size). Keep at most two derivatives plus the
-   original.
+   via a block variation; server-side render filter rewrites the
+   gallery output.
+2. **No WP intermediate-size explosion for gallery photos.** At most
+   three whitelisted derivatives plus the original.
 3. **Minimalistic.** No settings page in v0.1. Sensible defaults only.
 
-## Out of scope (for v0.1)
+## Out of scope (v0.1)
 
 - Albums, taxonomies, custom post types
 - WP.org distribution (private apermo.de use first; revisit later)
-- On-the-fly resizing / CDN integration (later, if needed)
+- On-the-fly resizing / CDN integration
 - Flickr / SmugMug / external photo source import
+- GPS map, lens, copyright, color-profile display
+- WP-CLI commands (a `flag <id...>` command is a v0.2 candidate)
 
----
+## Locked decisions
 
-## Open design questions
+| Topic | Decision |
+| --- | --- |
+| Image-size strategy | **Cleanup-after-the-fact.** Let WP generate normally; on flag-set, delete non-whitelisted derivatives and rewrite `_wp_attachment_metadata['sizes']`. Flag is set via Media Library bulk action **or** auto on `save_post` when an attachment first appears inside a styled gallery. |
+| Editor opt-in | Block variation **`Photo Gallery`** of `core/gallery`. Variation applies className `is-apermo-gallery`; render filter keys off this. |
+| Lightbox | **PhotoSwipe v5** with filmstrip. EXIF shipped inline as `data-apermo-exif` per item. |
+| EXIF caption | Two lines: (1) WP caption (falls back to title/alt); (2) `<camera> · f/X · 1/Y s · Z mm · ISO N · YYYY-MM-DD`. Missing values silently omitted. |
+| Custom sizes | `apermo-gallery-thumb` 400×400 soft-cropped · `apermo-gallery-medium` 1000 longest edge · `apermo-gallery-large` 1600 longest edge · original kept untouched. |
+| PhotoSwipe distribution | npm + `@wordpress/scripts` build. Source `assets/src/`, output `assets/build/` (committed). |
+| Manual flag UX | Media Library list-view bulk action **`Mark as gallery image`** only. No media-modal checkbox. |
+| Naming | `apermo-gallery` everywhere — slug, text domain, `is-apermo-gallery` class, `data-apermo-exif` attr, `_apermo_gallery_image` meta key. PHP namespace `Apermo\Gallery`. |
 
-### Q1 — How do we skip image-size generation for gallery photos?
-
-Candidates:
-
-- **A. Per-attachment opt-in flag.** Attachment meta (e.g.
-  `_apermo_gallery_image = 1`) marks photos intended for galleries.
-  `intermediate_image_sizes_advanced` filter returns only our two custom
-  sizes for marked attachments and strips the rest.
-- **B. Site-wide policy.** Globally disable default sizes. Rejected — too
-  invasive for non-gallery media.
-- **C. Block-driven auto-flag.** On post save, parse blocks and flag every
-  attachment inside a `core/gallery` for future reprocessing. Works going
-  forward, doesn't help retroactively (sizes are generated at upload time).
-- **D. Hybrid:** A "Gallery upload" affordance (block sidebar button or
-  custom media-library filter) sets the flag *before* derivatives are
-  generated. Server-side fallback also flags attachments that show up in a
-  gallery on save.
-
-Recommendation: **A + D combined.** Two custom sizes — `apermo-gallery-thumb`
-(400px square, soft-cropped) and `apermo-gallery-large` (1600px longest
-edge). Original kept untouched for download / max-zoom in lightbox.
-
-### Q2 — How do we hook into `core/gallery` without forking it?
-
-Candidates:
-
-- **A. Block style** (`is-style-apermo-gallery`). Pure PHP registration, no
-  JS bundle, opt-in per gallery via the style picker. Server-side
-  `render_block` filter detects the class on the wrapper and rewrites
-  output.
-- **B. Block variation.** Slightly richer editor UX (named "Photo Gallery"
-  in the inserter) but requires a JS bundle just to register the variation.
-- **C. Render-time enhancement of every `core/gallery`.** Zero editor
-  affordance, no opt-out — too magical.
-- **D. New block extending core.** Heaviest; rejected.
-
-Recommendation: **A.** Smallest surface. Upgrade to B later if the editor
-ergonomics matter.
-
-### Q3 — Lightbox
-
-Candidates:
-
-- **A. WordPress core's native image lightbox** (`core/image` `behavior:
-  lightbox`, 6.4+). Free, native, zero JS to ship. No EXIF, no filmstrip.
-- **B. PhotoSwipe v5.** ~30KB, no jQuery, well maintained. Filmstrip,
-  zoom, captions. Inject EXIF lines + filmstrip data server-side as `data-`
-  attributes; small bootstrap script wires it up.
-- **C. Custom mini-lightbox.** Reinventing the wheel for no reason.
-
-Recommendation: **B.** The EXIF + filmstrip requirement makes A
-insufficient. PhotoSwipe is the smallest dependency that delivers both.
-
-### Q4 — EXIF source & formatting
-
-- WordPress already extracts camera, aperture, shutter speed, focal length,
-  ISO, captured timestamp, and GPS into
-  `_wp_attachment_metadata['image_meta']` on upload. No extra parsing
-  needed.
-- A small formatter helper turns the raw values into human strings:
-  `f/2.8`, `1/250 s`, `35 mm`, `ISO 400`, capture date in site timezone.
-- GPS deferred to v0.2.
-
-### Q5 — Scope cut for v0.1
-
-- Block style `is-style-apermo-gallery` registered on `core/gallery`.
-- Two custom image sizes; `intermediate_image_sizes_advanced` filter
-  strips the rest for flagged attachments.
-- Attachment-meta flag set via a media-library bulk action and (fallback)
-  auto-flag on post save when an attachment first appears inside a styled
-  gallery.
-- Render filter rewrites the gallery's inner `core/image` blocks to use
-  the two custom sizes and adds EXIF data to each image as
-  `data-apermo-exif="…"`.
-- PhotoSwipe bootstrap reads those data attributes, builds the lightbox
-  with a filmstrip and an EXIF caption.
-- No admin settings page. No options.
-
----
-
-## Architecture sketch (post-`setup.sh`, plugin mode)
+## Component layout
 
 ```
-src/
-  Plugin.php              # bootstrap, hooks wiring
-  ImageSizes.php          # add_image_size + intermediate_image_sizes_advanced
-  BlockStyle.php          # register_block_style + render_block filter
-  Exif.php                # format image_meta into human strings
-  Lightbox.php            # enqueue PhotoSwipe + bootstrap
-  AttachmentFlag.php      # set/read _apermo_gallery_image, bulk action
+src/                                  # PSR-4 (Apermo\Gallery\…)
+  Plugin.php                          # bootstrap, hooks wiring
+  ImageSizes.php                      # add_image_size for 3 custom sizes
+  AttachmentFlag.php                  # read/set _apermo_gallery_image,
+                                      # Media Library bulk action
+  Cleanup.php                         # delete non-whitelisted derivatives,
+                                      # rewrite _wp_attachment_metadata['sizes']
+  BlockVariation.php                  # register variation + enqueue editor JS
+  Render.php                          # render_block filter for core/gallery
+                                      # when is-apermo-gallery class present
+  Exif.php                            # format image_meta into human strings
+  Lightbox.php                        # enqueue frontend bundle + CSS
+
 assets/
-  js/lightbox.js          # PhotoSwipe wiring
-  css/gallery.css         # minor grid/lightbox tweaks
-  vendor/photoswipe/      # vendored (or npm-built — TBD)
+  src/
+    editor/variation.js               # registers 'Photo Gallery' variation
+    frontend/lightbox.js              # PhotoSwipe wiring (reads data-apermo-exif)
+    frontend/gallery.css              # minimal grid + caption styling
+  build/                              # wp-scripts output (committed)
+
 tests/
-  Unit/ExifTest.php
-  Integration/ImageSizesTest.php
+  Unit/ExifTest.php                   # formatter null-safety + locale
+  Unit/AttachmentFlagTest.php         # flag set/read + bulk-action handler
+  Integration/ImageSizesTest.php      # add_image_size + filter behavior
+  Integration/CleanupTest.php         # file deletion + meta rewrite
+
 e2e/
-  gallery.spec.js
+  gallery.spec.js                     # insert variation, view post, open
+                                      # lightbox, verify caption + filmstrip
+                                      # + axe a11y assertion
 ```
 
+## Image-size pipeline
+
+1. Upload happens normally — WP generates its full derivative set.
+2. Flag is set on the attachment when **either**:
+   - The Media Library bulk action `Mark as gallery image` is applied,
+     **or**
+   - `save_post` fires and the post contains a gallery block with class
+     `is-apermo-gallery` referencing that attachment ID for the first
+     time.
+3. On flag-set, `Cleanup` runs:
+   - Reads `_wp_attachment_metadata['sizes']`.
+   - For every size **not** in the whitelist
+     (`apermo-gallery-thumb`, `apermo-gallery-medium`,
+     `apermo-gallery-large`), deletes the file under the attachment's
+     upload dir and removes the entry from the meta array.
+   - Persists the rewritten metadata.
+4. Original file is never touched.
+5. Cleanup is idempotent — re-running is a no-op when metadata already
+   matches the whitelist.
+
+**Known limitation**: a window exists between upload and flag-set where
+full derivatives sit on disk. Acceptable for v0.1.
+
+## Editor opt-in
+
+`BlockVariation` registers a JS bundle via `enqueue_block_editor_assets`.
+The bundle calls:
+
+```js
+wp.blocks.registerBlockVariation('core/gallery', {
+  name: 'apermo-gallery',
+  title: 'Photo Gallery',
+  isDefault: false,
+  attributes: { className: 'is-apermo-gallery' },
+  scope: ['inserter'],
+});
+```
+
+Authors choose `Photo Gallery` in the inserter; the resulting block is a
+regular `core/gallery` with `is-apermo-gallery` on the wrapper.
+
+## Server-side rendering
+
+`Render` filters `render_block` for `core/gallery`. When the wrapper
+class contains `is-apermo-gallery`:
+
+1. For each inner `core/image`:
+   - Resolve the attachment ID.
+   - Replace `src` with the `apermo-gallery-medium` URL.
+   - Replace `srcset` with `thumb 400w, medium 1000w, large 1600w`.
+   - Wrap the `<img>` in an `<a>` pointing to the
+     `apermo-gallery-large` URL with `data-apermo-exif="…formatted
+     line…"`.
+   - Preserve existing `alt` and `loading="lazy"` (WP default).
+2. Stamp class `apermo-gallery` on the outer container so the lightbox
+   bootstrap can attach with one selector.
+
+EXIF formatting comes from `Exif::format($image_meta)`, which:
+
+- Reads `_wp_attachment_metadata['image_meta']`.
+- Concatenates non-empty fields in order:
+  `camera · f/{aperture} · 1/{1/shutter} s · {focal} mm · ISO {iso} ·
+  {date_i18n(captured_at, site timezone)}`.
+- Returns the empty string when nothing is present.
+
+## Lightbox
+
+- `assets/src/frontend/lightbox.js` imports PhotoSwipe v5 +
+  PhotoSwipeLightbox.
+- One Lightbox instance per `.apermo-gallery` container, gallery
+  selector `a[data-apermo-exif]`, child selector `img`.
+- `contentLoad` event reads `data-apermo-exif` and renders it as the
+  EXIF line. The WP image caption is shown above (sourced from the
+  surrounding `<figcaption>` if present, falling back to image title /
+  alt).
+- Filmstrip enabled via PhotoSwipe's built-in thumbnails plugin.
+- Frontend bundle is enqueued only on singulars that contain a styled
+  gallery (`has_block`-style check during `wp_enqueue_scripts`).
+- Accessibility: PhotoSwipe v5 ships keyboard nav, focus trap, ESC
+  close, and ARIA labels. We do not add custom controls.
+
+## Image orientation note
+
+WordPress 5.3+ flattens EXIF orientation into the file during upload
+(`wp_maybe_exif_rotate`) and resets the orientation tag. Both the
+original and the surviving derivatives are correctly oriented in
+browsers. No extra handling needed.
+
 ---
 
-## Decisions deferred to planning session
+## Bootstrapping the repo from the template
 
-- Confirm Q1 recommendation (A + D) and the two custom-size dimensions.
-- Confirm Q2 (block style) vs. spending the JS bundle on a variation.
-- PhotoSwipe distribution: vendored static files vs. npm + build step.
-- Retroactive flag UX: bulk action only, or also a per-attachment
-  checkbox in the media modal sidebar?
-- Naming: `apermo-gallery` everywhere, or shorter slug for runtime
-  (e.g., `apg-…`) on data attributes / CSS classes?
+The repo currently holds the dual-mode template scaffold. To convert it
+into the plugin, run `setup.sh` with the answers below.
 
----
+### `setup.sh` answers
 
-## Reference
+| Prompt | Answer |
+| --- | --- |
+| `Project slug (kebab-case, e.g. my-plugin):` | `apermo-gallery` |
+| `PHP namespace (e.g. Apermo\\MyPlugin):` | `Apermo\Gallery` |
+| `Composer package name [apermo/apermo-gallery]:` | *(accept default)* |
+| `Select project mode:` | `1` (plugin) |
+| `Publish to WordPress.org? (y/N):` | `N` |
+| `Include opt-in confirm-deactivate example? (y/N):` | `N` |
+| `Configure GitHub repository? (y/N):` | `Y` *(only if `gh` is authenticated; otherwise `N` and configure later)* |
 
-Conversation that triggered this plugin (May 2026) compared third-party
-options (Meow Gallery + Meow Lightbox, NextGEN, FooGallery PRO, X3P0:
-Media Data). The conclusion was that none was minimalistic enough and
-none avoided WP's thumbnail explosion — hence this build.
+### What `setup.sh` will remove
+
+- **Plugin mode cleanup**: `style.css`, `functions.php`, `theme.json`,
+  `src/Theme.php`, `templates/`, `parts/`, **`assets/`**,
+  `.github/workflows/lhci.yml`, `.lighthouserc.js`, `.wp-env.json`.
+- **WP.org declined**: `.github/workflows/wporg-deploy.yml`,
+  `.github/workflows/plugin-check.yml`, `readme.txt`,
+  `.wordpress-org/`.
+- **Deactivation example declined**: `src/Admin/`,
+  `tests/Unit/Admin/`. Setup prints a WARN that lines marked
+  `// OPT-IN: confirm-deactivate` must be hand-removed from
+  `src/Main.php` and `tests/Unit/MainTest.php`.
+
+### Post-`setup.sh` manual steps (before first commit)
+
+1. Open `src/Main.php` and `tests/Unit/MainTest.php`; remove every line
+   marked `// OPT-IN: confirm-deactivate`.
+2. Recreate the `assets/` tree:
+   - `assets/src/editor/variation.js` (stub)
+   - `assets/src/frontend/lightbox.js` (stub)
+   - `assets/src/frontend/gallery.css` (stub)
+3. Add `@wordpress/scripts` and `photoswipe` to `package.json` dev
+   deps; wire `npm run build` to wp-scripts; output to `assets/build/`.
+4. Verify `.gitattributes` and `phpstan.neon.dist` don't reference
+   removed paths.
+5. First commit: `feat: initial apermo-gallery scaffolding`.
+
+## Verification (after implementation, before tagging v0.1)
+
+1. `composer install && npm install && npm run build`
+2. `ddev start && ddev orchestrate`
+3. Create a draft post, insert `Photo Gallery` variation, attach three
+   photos with embedded EXIF.
+4. Publish. View the post.
+5. Inspect HTML: each item has
+   `<a href="…-1600.jpg" data-apermo-exif="…">`.
+6. Open one image — PhotoSwipe lightbox shows caption + EXIF line +
+   filmstrip.
+7. Check `wp-content/uploads/<year>/<month>/`: only the three
+   whitelisted derivatives + original exist for those attachments.
+8. Run automated suite: `composer test && npm run test:e2e`.
+9. E2E spec opens the lightbox and asserts no axe-core violations.
