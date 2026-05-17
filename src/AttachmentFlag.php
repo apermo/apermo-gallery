@@ -51,6 +51,15 @@ class AttachmentFlag {
 		}
 
 		update_post_meta( $attachment_id, self::META_KEY, 1 );
+
+		/**
+		 * Fires after an attachment has been newly flagged as a gallery photo.
+		 *
+		 * Subscribers (e.g. derivative cleanup) can react to this without coupling
+		 * to how the flag was set — manual bulk action, render auto-flag, future paths.
+		 *
+		 * @param int $attachment_id The freshly flagged attachment ID.
+		 */
 		do_action( 'apermo_gallery_flag_set', $attachment_id );
 	}
 
@@ -82,9 +91,9 @@ class AttachmentFlag {
 		}
 
 		foreach ( $ids as $id ) {
-			self::flag( (int) $id );
+			self::flag( $id );
 		}
 
-		return add_query_arg( 'apermo_gallery_flagged', count( $ids ), $sendback );
+		return add_query_arg( 'apermo_gallery_flagged', \count( $ids ), $sendback );
 	}
 }

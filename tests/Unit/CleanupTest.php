@@ -15,7 +15,7 @@ use PHPUnit\Framework\TestCase;
 class CleanupTest extends TestCase {
 
 	/**
-	 * Sets up Brain Monkey and stubs filesystem helpers to deterministic behaviour.
+	 * Sets up Brain Monkey and stubs trailingslashit to a deterministic implementation.
 	 *
 	 * @return void
 	 */
@@ -23,8 +23,9 @@ class CleanupTest extends TestCase {
 		parent::setUp();
 		Monkey\setUp();
 
-		Functions\when( 'trailingslashit' )->alias( static fn ( string $p ): string => rtrim( $p, '/' ) . '/' );
-		Functions\when( 'file_exists' )->justReturn( true );
+		Functions\when( 'trailingslashit' )->alias(
+			static fn ( string $path ): string => rtrim( $path, '/' ) . '/',
+		);
 	}
 
 	/**
@@ -93,8 +94,8 @@ class CleanupTest extends TestCase {
 	public function test_cleanup_deletes_non_whitelisted_files_and_updates_meta(): void {
 		Functions\expect( 'wp_get_attachment_metadata' )->once()->andReturn(
 			[
-				'width'  => 4000,
-				'sizes'  => [
+				'width' => 4000,
+				'sizes' => [
 					'thumbnail'             => [ 'file' => 'photo-150x150.jpg' ],
 					'medium'                => [ 'file' => 'photo-300x200.jpg' ],
 					'large'                 => [ 'file' => 'photo-1024x683.jpg' ],

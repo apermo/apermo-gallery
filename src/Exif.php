@@ -19,8 +19,8 @@ class Exif {
 	public static function format( array $image_meta ): string {
 		$parts = [];
 
-		$camera = trim( (string) ( $image_meta['camera'] ?? '' ) );
-		if ( '' !== $camera ) {
+		$camera = \trim( (string) ( $image_meta['camera'] ?? '' ) );
+		if ( $camera !== '' ) {
 			$parts[] = $camera;
 		}
 
@@ -39,9 +39,9 @@ class Exif {
 			$parts[] = self::trim_decimals( $focal ) . ' mm';
 		}
 
-		$iso = (int) ( $image_meta['iso'] ?? 0 );
-		if ( $iso > 0 ) {
-			$parts[] = 'ISO ' . $iso;
+		$iso_value = (int) ( $image_meta['iso'] ?? 0 );
+		if ( $iso_value > 0 ) {
+			$parts[] = 'ISO ' . $iso_value;
 		}
 
 		$timestamp = (int) ( $image_meta['created_timestamp'] ?? 0 );
@@ -49,7 +49,7 @@ class Exif {
 			$parts[] = date_i18n( 'Y-m-d', $timestamp );
 		}
 
-		return implode( ' · ', $parts );
+		return \implode( ' · ', $parts );
 	}
 
 	/**
@@ -64,7 +64,7 @@ class Exif {
 			return self::trim_decimals( $seconds ) . ' s';
 		}
 
-		$denominator = (int) round( 1 / $seconds );
+		$denominator = (int) \round( 1 / $seconds );
 
 		return '1/' . $denominator . ' s';
 	}
@@ -77,6 +77,6 @@ class Exif {
 	 * @return string
 	 */
 	private static function trim_decimals( float $value ): string {
-		return rtrim( rtrim( number_format( $value, 1, '.', '' ), '0' ), '.' );
+		return \rtrim( \rtrim( \number_format( $value, 1, '.', '' ), '0' ), '.' );
 	}
 }

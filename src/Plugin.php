@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Apermo\Gallery;
 
 /**
- * Central registry that wires the plugin's components.
+ * Wires the plugin's components from a single registry.
  */
 class Plugin {
 

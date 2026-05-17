@@ -29,23 +29,23 @@ class BlockVariation {
 	public static function enqueue(): void {
 		$main_file = Main::file();
 
-		if ( '' === $main_file ) {
+		if ( $main_file === '' ) {
 			return;
 		}
 
-		$asset_path = dirname( $main_file ) . '/assets/build/editor/variation.asset.php';
+		$asset_path = \dirname( $main_file ) . '/assets/build/editor/variation.asset.php';
 
-		if ( ! file_exists( $asset_path ) ) {
+		if ( ! \file_exists( $asset_path ) ) {
 			return;
 		}
 
-		$asset = include $asset_path;
+		$asset = require $asset_path;
 
 		wp_enqueue_script(
 			'apermo-gallery-variation',
 			plugins_url( 'assets/build/editor/variation.js', $main_file ),
-			$asset['dependencies'] ?? [],
-			$asset['version'] ?? Main::VERSION,
+			\is_array( $asset ) && isset( $asset['dependencies'] ) ? (array) $asset['dependencies'] : [],
+			\is_array( $asset ) && isset( $asset['version'] ) ? (string) $asset['version'] : Main::VERSION,
 			true,
 		);
 	}

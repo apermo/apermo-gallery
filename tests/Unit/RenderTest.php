@@ -58,7 +58,10 @@ class RenderTest extends TestCase {
 	 */
 	public function test_other_blocks_pass_through(): void {
 		$content = '<p>Hello</p>';
-		$block   = [ 'blockName' => 'core/paragraph', 'attrs' => [] ];
+		$block   = [
+			'blockName' => 'core/paragraph',
+			'attrs'     => [],
+		];
 
 		$this->assertSame( $content, Render::filter( $content, $block ) );
 	}
@@ -70,7 +73,10 @@ class RenderTest extends TestCase {
 	 */
 	public function test_gallery_without_optin_class_passes_through(): void {
 		$content = '<figure class="wp-block-gallery"></figure>';
-		$block   = [ 'blockName' => 'core/gallery', 'attrs' => [ 'className' => 'is-cropped' ] ];
+		$block   = [
+			'blockName' => 'core/gallery',
+			'attrs'     => [ 'className' => 'is-cropped' ],
+		];
 
 		$this->assertSame( $content, Render::filter( $content, $block ) );
 	}

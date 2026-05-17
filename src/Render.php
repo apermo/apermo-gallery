@@ -24,6 +24,14 @@ class Render {
 	];
 
 	/**
+	 * Holds the per-attachment data captured during attribute rewriting and
+	 * consumed by the anchor-wrapping pass.
+	 *
+	 * @var array<int, array{href: string, width: int, height: int, exif: string}>
+	 */
+	private static array $anchor_data = [];
+
+	/**
 	 * Registers the WordPress hooks owned by this component.
 	 *
 	 * @return void
@@ -41,80 +49,106 @@ class Render {
 	 * @return string
 	 */
 	public static function filter( string $block_content, array $block ): string {
-		if ( 'core/gallery' !== ( $block['blockName'] ?? '' ) ) {
+		if ( ( $block['blockName'] ?? '' ) !== 'core/gallery' ) {
 			return $block_content;
 		}
 
 		$class_name = (string) ( $block['attrs']['className'] ?? '' );
 
-		if ( ! str_contains( $class_name, 'is-apermo-gallery' ) ) {
+		if ( ! \str_contains( $class_name, 'is-apermo-gallery' ) ) {
 			return $block_content;
 		}
 
-		$wraps    = self::rewrite_image_attributes( $block_content );
-		$wrapped  = self::wrap_images_with_anchors( $wraps['html'], $wraps['data'] );
-		$finished = self::stamp_container_class( $wrapped );
+		$rewritten = self::rewrite_image_attributes( $block_content );
+		$wrapped   = self::wrap_images_with_anchors( $rewritten );
 
-		return $finished;
+		return self::stamp_container_class( $wrapped );
 	}
 
 	/**
-	 * Rewrites every `<img>`'s src and srcset to the Apermo Gallery sizes.
-	 *
-	 * Returns the updated HTML alongside a map keyed by attachment ID containing
-	 * the data needed by `wrap_images_with_anchors` (large URL + EXIF caption).
+	 * Rewrites every `<img>`'s src and srcset to the Apermo Gallery sizes, populating
+	 * `$anchor_data` with the per-attachment payload used in the wrapping pass.
 	 *
 	 * @param string $html The original block HTML.
 	 *
-	 * @return array{html: string, data: array<int, array{href: string, width: int, height: int, exif: string}>}
+	 * @return string
 	 */
-	private static function rewrite_image_attributes( string $html ): array {
+	private static function rewrite_image_attributes( string $html ): string {
+		self::$anchor_data = [];
+
 		$processor = new WP_HTML_Tag_Processor( $html );
-		$data      = [];
 
-		while ( $processor->next_tag( 'img' ) ) {
-			$class_attr = (string) $processor->get_attribute( 'class' );
+		while ( $processor->next_tag( [ 'tag_name' => 'img' ] ) ) {
+			$attachment_id = self::extract_attachment_id( (string) $processor->get_attribute( 'class' ) );
 
-			if ( 1 !== preg_match( '/\bwp-image-(\d+)\b/', $class_attr, $matches ) ) {
+			if ( $attachment_id === 0 ) {
 				continue;
 			}
 
-			$attachment_id = (int) $matches[1];
-
-			$medium_url = wp_get_attachment_image_url( $attachment_id, ImageSizes::MEDIUM );
-			$large_url  = wp_get_attachment_image_url( $attachment_id, ImageSizes::LARGE );
-
-			if ( is_string( $medium_url ) && '' !== $medium_url ) {
-				$processor->set_attribute( 'src', $medium_url );
-			}
-
-			$srcset = self::build_srcset( $attachment_id );
-
-			if ( '' !== $srcset ) {
-				$processor->set_attribute( 'srcset', $srcset );
-				$processor->set_attribute( 'sizes', '(max-width: 600px) 100vw, 1000px' );
-			}
-
-			$metadata   = wp_get_attachment_metadata( $attachment_id );
-			$image_meta = is_array( $metadata ) && isset( $metadata['image_meta'] ) && is_array( $metadata['image_meta'] )
-				? $metadata['image_meta']
-				: [];
-
-			$large = wp_get_attachment_image_src( $attachment_id, ImageSizes::LARGE );
-
-			$data[ $attachment_id ] = [
-				'href'   => is_string( $large_url ) && '' !== $large_url ? $large_url : (string) $medium_url,
-				'width'  => is_array( $large ) && isset( $large[1] ) ? (int) $large[1] : 0,
-				'height' => is_array( $large ) && isset( $large[2] ) ? (int) $large[2] : 0,
-				'exif'   => Exif::format( $image_meta ),
-			];
+			self::apply_apermo_sizes( $processor, $attachment_id );
+			self::record_anchor_data( $attachment_id );
 
 			AttachmentFlag::flag( $attachment_id );
 		}
 
-		return [
-			'html' => $processor->get_updated_html(),
-			'data' => $data,
+		return $processor->get_updated_html();
+	}
+
+	/**
+	 * Extracts the attachment ID from a `wp-image-NNN` class string, or returns 0.
+	 *
+	 * @param string $class_attribute The raw class attribute value.
+	 *
+	 * @return int
+	 */
+	private static function extract_attachment_id( string $class_attribute ): int {
+		if ( \preg_match( '/\bwp-image-(\d+)\b/', $class_attribute, $matches ) !== 1 ) {
+			return 0;
+		}
+
+		return (int) $matches[1];
+	}
+
+	/**
+	 * Sets the medium URL on `src` and a thumb/medium/large srcset on the current `<img>` tag.
+	 *
+	 * @param WP_HTML_Tag_Processor $processor     The processor positioned at an `<img>`.
+	 * @param int                   $attachment_id The attachment ID.
+	 *
+	 * @return void
+	 */
+	private static function apply_apermo_sizes( WP_HTML_Tag_Processor $processor, int $attachment_id ): void {
+		$medium_url = wp_get_attachment_image_url( $attachment_id, ImageSizes::MEDIUM );
+
+		if ( \is_string( $medium_url ) && $medium_url !== '' ) {
+			$processor->set_attribute( 'src', $medium_url );
+		}
+
+		$srcset = self::build_srcset( $attachment_id );
+
+		if ( $srcset !== '' ) {
+			$processor->set_attribute( 'srcset', $srcset );
+			$processor->set_attribute( 'sizes', '(max-width: 600px) 100vw, 1000px' );
+		}
+	}
+
+	/**
+	 * Records the href, dimensions, and EXIF caption for an attachment ahead of the wrapping pass.
+	 *
+	 * @param int $attachment_id The attachment ID.
+	 *
+	 * @return void
+	 */
+	private static function record_anchor_data( int $attachment_id ): void {
+		$large_url = wp_get_attachment_image_url( $attachment_id, ImageSizes::LARGE );
+		$large_src = wp_get_attachment_image_src( $attachment_id, ImageSizes::LARGE );
+		$metadata  = wp_get_attachment_metadata( $attachment_id );
+
+		self::$anchor_data[ $attachment_id ] = [
+			'href'   => \is_string( $large_url ) && $large_url !== '' ? $large_url : '',
+			'width'  => \is_array( $large_src ) ? $large_src[1] : 0,
+			'height' => \is_array( $large_src ) ? $large_src[2] : 0,
+			'exif'   => Exif::format( \is_array( $metadata ) ? $metadata['image_meta'] : [] ),
 		];
 	}
 
@@ -130,49 +164,59 @@ class Render {
 
 		foreach ( self::SRCSET_WIDTHS as $size => $width ) {
 			$url = wp_get_attachment_image_url( $attachment_id, $size );
-			if ( is_string( $url ) && '' !== $url ) {
+			if ( \is_string( $url ) && $url !== '' ) {
 				$parts[] = $url . ' ' . $width . 'w';
 			}
 		}
 
-		return implode( ', ', $parts );
+		return \implode( ', ', $parts );
 	}
 
 	/**
 	 * Wraps every `<img class="...wp-image-NNN...">` with an anchor to its large URL.
 	 *
-	 * @param string                                                                       $html The HTML with rewritten img attributes.
-	 * @param array<int, array{href: string, width: int, height: int, exif: string}>       $data Per-attachment href + dimensions + EXIF.
+	 * @param string $html The HTML with rewritten img attributes.
 	 *
 	 * @return string
 	 */
-	private static function wrap_images_with_anchors( string $html, array $data ): string {
-		if ( [] === $data ) {
+	private static function wrap_images_with_anchors( string $html ): string {
+		if ( self::$anchor_data === [] ) {
 			return $html;
 		}
 
-		$result = preg_replace_callback(
+		$result = \preg_replace_callback(
 			'/<img\b[^>]*\bclass="[^"]*\bwp-image-(\d+)\b[^"]*"[^>]*>/',
-			static function ( array $match ) use ( $data ): string {
-				$attachment_id = (int) $match[1];
-
-				if ( ! isset( $data[ $attachment_id ] ) ) {
-					return $match[0];
-				}
-
-				return sprintf(
-					'<a href="%s" data-pswp-width="%d" data-pswp-height="%d" data-apermo-exif="%s">%s</a>',
-					esc_url( $data[ $attachment_id ]['href'] ),
-					$data[ $attachment_id ]['width'],
-					$data[ $attachment_id ]['height'],
-					esc_attr( $data[ $attachment_id ]['exif'] ),
-					$match[0],
-				);
-			},
+			[ self::class, 'wrap_single_image' ],
 			$html,
 		);
 
-		return is_string( $result ) ? $result : $html;
+		return \is_string( $result ) ? $result : $html;
+	}
+
+	/**
+	 * Renders a single `<img>` wrapped in an anchor carrying PhotoSwipe + EXIF data.
+	 *
+	 * @param array<int, string> $match The preg_replace_callback match (full tag at 0, attachment ID at 1).
+	 *
+	 * @return string
+	 */
+	private static function wrap_single_image( array $match ): string {
+		$attachment_id = (int) $match[1];
+
+		if ( ! isset( self::$anchor_data[ $attachment_id ] ) ) {
+			return $match[0];
+		}
+
+		$data = self::$anchor_data[ $attachment_id ];
+
+		return \sprintf(
+			'<a href="%s" data-pswp-width="%d" data-pswp-height="%d" data-apermo-exif="%s">%s</a>',
+			esc_url( $data['href'] ),
+			$data['width'],
+			$data['height'],
+			esc_attr( $data['exif'] ),
+			$match[0],
+		);
 	}
 
 	/**
@@ -185,7 +229,14 @@ class Render {
 	private static function stamp_container_class( string $html ): string {
 		$processor = new WP_HTML_Tag_Processor( $html );
 
-		if ( $processor->next_tag( [ 'tag_name' => 'figure', 'class_name' => 'wp-block-gallery' ] ) ) {
+		$found = $processor->next_tag(
+			[
+				'tag_name'   => 'figure',
+				'class_name' => 'wp-block-gallery',
+			],
+		);
+
+		if ( $found ) {
 			$processor->add_class( 'apermo-gallery' );
 		}
 

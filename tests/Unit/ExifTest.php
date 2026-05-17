@@ -50,7 +50,7 @@ class ExifTest extends TestCase {
 			'shutter_speed'     => '0.004',
 			'focal_length'      => '35',
 			'iso'               => '400',
-			'created_timestamp' => 1_773_360_000,
+			'created_timestamp' => 1_773_273_600,
 		];
 
 		$this->assertSame(

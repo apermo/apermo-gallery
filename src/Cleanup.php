@@ -33,37 +33,75 @@ class Cleanup {
 	public static function cleanup( int $attachment_id ): void {
 		$metadata = wp_get_attachment_metadata( $attachment_id );
 
-		if ( ! is_array( $metadata ) || empty( $metadata['sizes'] ) || ! is_array( $metadata['sizes'] ) ) {
+		if ( ! \is_array( $metadata ) ) {
+			return;
+		}
+
+		$sizes = $metadata['sizes'];
+
+		if ( $sizes === [] ) {
 			return;
 		}
 
 		$original = get_attached_file( $attachment_id );
 
-		if ( ! is_string( $original ) || '' === $original ) {
+		if ( ! \is_string( $original ) || $original === '' ) {
 			return;
 		}
 
-		$directory = trailingslashit( dirname( $original ) );
-		$changed   = false;
+		$kept = self::prune_sizes( $sizes, trailingslashit( \dirname( $original ) ) );
 
-		foreach ( $metadata['sizes'] as $size => $info ) {
-			if ( in_array( $size, ImageSizes::WHITELIST, true ) ) {
+		if ( \count( $kept ) === \count( $sizes ) ) {
+			return;
+		}
+
+		$metadata['sizes'] = $kept;
+
+		wp_update_attachment_metadata( $attachment_id, $metadata );
+	}
+
+	/**
+	 * Returns the subset of `$sizes` that belong to the whitelist, deleting the rest from disk.
+	 *
+	 * @param array<string, mixed> $sizes     The original `sizes` map from attachment metadata.
+	 * @param string               $directory Absolute path to the attachment's upload directory (trailing slash included).
+	 *
+	 * @return array<string, mixed>
+	 */
+	private static function prune_sizes( array $sizes, string $directory ): array {
+		$kept = [];
+
+		foreach ( $sizes as $size => $info ) {
+			if ( \in_array( $size, ImageSizes::WHITELIST, true ) ) {
+				$kept[ $size ] = $info;
 				continue;
 			}
 
-			if ( is_array( $info ) && ! empty( $info['file'] ) && is_string( $info['file'] ) ) {
-				$path = $directory . $info['file'];
-				if ( file_exists( $path ) ) {
-					wp_delete_file( $path );
-				}
-			}
-
-			unset( $metadata['sizes'][ $size ] );
-			$changed = true;
+			self::delete_size_file( $info, $directory );
 		}
 
-		if ( $changed ) {
-			wp_update_attachment_metadata( $attachment_id, $metadata );
+		return $kept;
+	}
+
+	/**
+	 * Deletes the file referenced by a single size record, when one is present.
+	 *
+	 * @param mixed  $info      The size record from attachment metadata.
+	 * @param string $directory Absolute path to the attachment's upload directory.
+	 *
+	 * @return void
+	 */
+	private static function delete_size_file( mixed $info, string $directory ): void {
+		if ( ! \is_array( $info ) ) {
+			return;
 		}
+
+		$file = $info['file'] ?? '';
+
+		if ( ! \is_string( $file ) || $file === '' ) {
+			return;
+		}
+
+		wp_delete_file( $directory . $file );
 	}
 }
