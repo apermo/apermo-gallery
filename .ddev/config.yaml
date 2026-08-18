@@ -1,4 +1,4 @@
-name: plugin-name
+name: apermo-gallery
 type: php
 docroot: .ddev/wordpress
 php_version: "8.4"

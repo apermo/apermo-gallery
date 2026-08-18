@@ -2,10 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Plugin_Name;
-
-// OPT-IN: confirm-deactivate — delete this use statement if you declined the example.
-use Plugin_Name\Admin\DeactivationFlow;
+namespace Apermo\Gallery;
 
 /**
  * Bootstraps the plugin.
@@ -69,9 +66,6 @@ class Main {
 	 * @return void
 	 */
 	public static function boot(): void {
-		// OPT-IN: confirm-deactivate — delete the next 3 lines if you declined the example.
-		if ( is_admin() ) {
-			( new DeactivationFlow() )->register();
-		}
+		Plugin::boot();
 	}
 }

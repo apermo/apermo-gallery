@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Plugin_Name\Tests\Integration;
+namespace Apermo\Gallery\Tests\Integration;
 
-use Plugin_Name\Main;
+use Apermo\Gallery\Main;
 use WP_UnitTestCase;
 
 /**
